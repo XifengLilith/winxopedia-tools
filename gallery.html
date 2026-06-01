@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Gallery Sorter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+    <h1>Gallery Sorter</h1>
+    <a href="index.html"><button>Назад в меню</button></a>
+</header>
+
+<div class="gallery-container">
+    <textarea id="input-code" placeholder="Вставь <gallery> код сюда..."></textarea>
+    
+    <div class="gallery-controls">
+        <button onclick="parseGallery()">Загрузить</button>
+        <button id="moveTopBtn" onclick="moveSelectedToTop()" disabled>В начало ↑</button>
+        <button onclick="copyResult()">Скопировать код</button>
+        <button onclick="clearSelection()">Снять выделение</button>
+        <span id="selCount">Выбрано: 0</span>
+    </div>
+
+    <div id="gallery-grid" class="gallery-grid"></div>
+</div>
+
+<script>
+    const grid = document.getElementById('gallery-grid');
+    const selCountText = document.getElementById('selCount');
+    const moveTopBtn = document.getElementById('moveTopBtn');
+    const IMG_URL = "https://winxopedia.fandom.com/ru/wiki/Special:FilePath/";
+
+    function parseGallery() {
+        const code = document.getElementById('input-code').value;
+        grid.innerHTML = '';
+        const lines = code.split('\n');
+        
+        lines.forEach(line => {
+            let trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith('<') || trimmed.startsWith('</')) return;
+            const parts = trimmed.split('|');
+            createCard(parts[0].trim(), parts[1] ? parts[1].trim() : '');
+        });
+        updateSelectionUI();
+    }
+
+    function createCard(fileName, caption) {
+        const div = document.createElement('div');
+        div.className = 'item';
+        div.draggable = true;
+        div.dataset.filename = fileName;
+        div.dataset.caption = caption;
+
+        div.innerHTML = `
+            <div class="remove-btn" onclick="this.parentElement.remove(); updateSelectionUI();">×</div>
+            <img src="${IMG_URL}${encodeURIComponent(fileName)}?width=180" loading="lazy">
+            <div class="item-text"><b>${fileName}</b>${caption ? `<br><i style="color:var(--accentSmall)">| ${caption}</i>` : ''}</div>
+        `;
+
+        div.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-btn')) return;
+            div.classList.toggle('selected');
+            updateSelectionUI();
+        });
+
+        div.addEventListener('dragstart', (e) => {
+            if (!div.classList.contains('selected')) {
+                clearSelection();
+                div.classList.add('selected');
+            }
+            e.dataTransfer.setData('text/plain', 'drag');
+            document.querySelectorAll('.selected').forEach(el => el.classList.add('dragging'));
+        });
+
+        div.addEventListener('dragend', () => {
+            document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+        });
+
+        grid.appendChild(div);
+    }
+
+    function updateSelectionUI() {
+        const selected = document.querySelectorAll('.item.selected').length;
+        selCountText.textContent = `Выбрано: ${selected}`;
+        moveTopBtn.disabled = selected === 0;
+    }
+
+    function clearSelection() {
+        document.querySelectorAll('.item.selected').forEach(el => el.classList.remove('selected'));
+        updateSelectionUI();
+    }
+
+    function moveSelectedToTop() {
+        const selected = document.querySelectorAll('.item.selected');
+        for (let i = selected.length - 1; i >= 0; i--) {
+            grid.prepend(selected[i]);
+        }
+        clearSelection();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    grid.addEventListener('dragover', e => {
+        e.preventDefault();
+        const afterElement = getDragAfterElement(grid, e.clientX, e.clientY);
+        const draggingElements = document.querySelectorAll('.selected');
+        draggingElements.forEach(el => {
+            if (afterElement == null) grid.appendChild(el);
+            else grid.insertBefore(el, afterElement);
+        });
+    });
+
+    function getDragAfterElement(container, x, y) {
+        const draggableElements = [...container.querySelectorAll('.item:not(.selected)')];
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const centerX = box.left + box.width / 2;
+            const centerY = box.top + box.height / 2;
+            const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+            return distance < closest.offset ? { offset: distance, element: child } : closest;
+        }, { offset: Number.POSITIVE_INFINITY }).element;
+    }
+
+    function copyResult() {
+        const items = grid.querySelectorAll('.item');
+        let result = '<gallery mode="packed" widths="185">\n';
+        items.forEach(item => {
+            result += item.dataset.filename + (item.dataset.caption ? ' | ' + item.dataset.caption : '') + '\n';
+        });
+        result += '</gallery>';
+        navigator.clipboard.writeText(result).then(() => alert('Скопировано!'));
+    }
+</script>
+</body>
+</html>

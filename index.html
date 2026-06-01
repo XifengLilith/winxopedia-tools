@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Винксопедия: Инструменты</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Инструменты Винксопедии</h1>
+      <button onclick="toggleTheme()">Сменить тему</button>
+    </header>
+
+    <main class="tools-grid">
+      <div class="tool-card">
+        <h3>Article Refiner</h3>
+        <p>Поиск и сортировка статей по категориям обслуживания.</p>
+        <a href="refiner.html"><button>Открыть</button></a>
+      </div>
+      <div class="tool-card">
+        <h3>Gallery Sorter</h3>
+        <p>Массовая сортировка и перестановка изображений в галереях.</p>
+        <a href="gallery.html"><button>Открыть</button></a>
+      </div>
+    </main>
+
+    <script>
+      function toggleTheme() {
+        document.documentElement.classList.toggle("light");
+        document.documentElement.classList.toggle("dark");
+      }
+    </script>
+  </body>
+</html>

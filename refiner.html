@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Article Refiner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <h1>Article Refiner</h1>
+        <a href="index.html"><button>Назад в меню</button></a>
+    </header>
+
+    <main>
+        <button id="scanBtn" onclick="runRefiner()">Запустить сканирование</button>
+        
+        <div id="progressContainer" style="width:100%; height:10px; background:var(--overlay); margin: 15px 0; display:none;">
+            <div id="progressBar" style="width:0%; height:100%; background:var(--accentLarge); transition: width 0.3s;"></div>
+        </div>
+
+        <div id="status" style="margin-bottom: 10px;"></div>
+
+        <div id="dashboard">
+            <aside id="sidebar">
+                <h3>Карта проблем</h3>
+                <div id="chartContainer"></div>
+            </aside>
+            <div id="resultsGrid" class="refiner-container"></div>
+        </div>
+    </main>
+
+    <script>
+        const API = "https://winxopedia.fandom.com/ru/api.php";
+
+        function getSafeId(str) {
+            return 'cat-' + btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (m, p1) => String.fromCharCode('0x' + p1))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+
+        async function runRefiner() {
+            const btn = document.getElementById('scanBtn');
+            const status = document.getElementById('status');
+            const grid = document.getElementById('resultsGrid');
+            const chart = document.getElementById('chartContainer');
+            const bar = document.getElementById('progressBar');
+            
+            btn.disabled = true;
+            grid.innerHTML = "";
+            chart.innerHTML = "";
+            document.getElementById('progressContainer').style.display = "block";
+
+            const pages = await fetchAllMembers("Незавершённые_статьи");
+            let groups = {};
+            let count = 0;
+
+            for (let i = 0; i < pages.length; i += 10) {
+                let chunk = pages.slice(i, i + 10);
+                await Promise.all(chunk.map(async (title) => {
+                    let cats = await fetchPageCategories(title);
+                    cats.forEach(cat => {
+                        if (cat === "Незавершённые статьи") return;
+                        
+                        const safeId = getSafeId(cat);
+                        if (!groups[cat]) {
+                            groups[cat] = [];
+                            let div = document.createElement('div');
+                            div.className = 'category-group';
+                            div.id = safeId;
+                            div.innerHTML = `<h2>${cat}</h2><div class="group-content"></div>`;
+                            grid.appendChild(div);
+                        }
+                        
+                        groups[cat].push(title);
+                        const target = document.querySelector(`#${safeId} .group-content`);
+                        if (target) {
+                            target.innerHTML += `<div class="task-card"><a href="https://winxopedia.fandom.com/ru/wiki/${encodeURIComponent(title)}" target="_blank">${title}</a></div>`;
+                        }
+                    });
+                }));
+                
+                count += chunk.length;
+                bar.style.width = `${(count / pages.length) * 100}%`;
+                status.textContent = `Обработано: ${count} из ${pages.length}`;
+            }
+
+            // Строим график
+            const sorted = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length);
+            sorted.forEach(cat => {
+                const percent = (groups[cat].length / pages.length) * 100;
+                chart.innerHTML += `
+                    <div class="bar-wrapper">
+                        <div class="bar-label"><a href="#${getSafeId(cat)}">${cat}</a> <span>${groups[cat].length}</span></div>
+                        <div class="bar-bg"><div class="bar-fill" style="width: ${percent}%"></div></div>
+                    </div>`;
+            });
+            
+            status.textContent = "Готово!";
+            btn.disabled = false;
+        }
+
+        async function fetchAllMembers(cat) {
+            let results = [];
+            let cmcontinue = "";
+            do {
+                const url = `${API}?action=query&list=categorymembers&cmtitle=Category:${cat}&cmlimit=500&cmtype=page&format=json&origin=*${cmcontinue ? `&cmcontinue=${cmcontinue}` : ""}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.query?.categorymembers) results.push(...data.query.categorymembers.map(m => m.title));
+                cmcontinue = data.continue?.cmcontinue;
+            } while (cmcontinue);
+            return results;
+        }
+
+        async function fetchPageCategories(title) {
+            const url = `${API}?action=query&prop=categories&titles=${encodeURIComponent(title)}&cllimit=20&format=json&origin=*`;
+            const res = await fetch(url);
+            const data = await res.json();
+            const page = Object.values(data.query.pages)[0];
+            return page.categories ? page.categories.map(c => c.title.replace('Категория:', '')) : ['Без категории'];
+        }
+    </script>
+</body>
+</html>
