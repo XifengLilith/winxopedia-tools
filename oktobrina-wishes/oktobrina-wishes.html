@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Святилище Октобрины — Милость Осени</title>
+    <!-- Фавикон -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Dark Theme */
+            --bg: #1e1212;
+            --overlay: #3e1e1c;
+            --accentLarge: #9b5737;
+            --accentSmall: #e8b27c;
+            --accentBright: #fccf95;
+            --text: #fff8ea;
+            --textOnAccent: #fcf8f1;
+            --glow: rgba(252, 207, 149, 0.3);
+        }
+
+        html.light {
+            /* Light Theme */
+            --bg: #fcf4e6;
+            --overlay: #ecd3b4;
+            --accentLarge: #9b5737;
+            --accentSmall: #6d2a1b;
+            --accentBright: #450409;
+            --text: #1a0e0e;
+            --textOnAccent: #fcf8f1;
+            --glow: rgba(109, 42, 27, 0.2);
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Roboto', sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            box-sizing: border-box;
+            transition: background-color 0.5s ease;
+        }
+
+        #ambient-canvas {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        #app-wrapper {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 1100px;
+        }
+
+        #controls {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .controls-left, .controls-right {
+            display: flex;
+            gap: 10px;
+        }
+
+        .control-btn {
+            background: linear-gradient(135deg, var(--overlay), rgba(0,0,0,0.2));
+            color: var(--text);
+            border: 1px solid var(--accentLarge);
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 500;
+            letter-spacing: 1px;
+            backdrop-filter: blur(5px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .control-btn:hover {
+            border-color: var(--accentBright);
+            box-shadow: 0 0 15px var(--glow);
+            transform: translateY(-2px);
+        }
+
+        /* Статичный баннер с эффектом скользящего блика */
+        #banner-frame {
+            width: 100%;
+            aspect-ratio: 1100 / 620;
+            border: 2px solid var(--accentLarge);
+            border-radius: 16px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.6);
+            overflow: hidden;
+            background-color: var(--overlay);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            position: relative;
+        }
+
+        /* Эффект скользящего наклонного блика */
+        #banner-frame::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -150%;
+            width: 80%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                transparent 0%,
+                rgba(252, 207, 149, 0) 30%,
+                rgba(252, 207, 149, 0.15) 50%,
+                rgba(252, 207, 149, 0) 70%,
+                transparent 100%
+            );
+            transform: skewX(-25deg);
+            z-index: 3;
+            pointer-events: none;
+            animation: periodicGlint 7s infinite ease-in-out;
+        }
+
+        @keyframes periodicGlint {
+            0% { left: -150%; }
+            15% { left: 150%; }
+            100% { left: 150%; }
+        }
+
+        #banner-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        #banner-frame.fade-out {
+            opacity: 0;
+            transform: scale(0.98);
+            pointer-events: none;
+        }
+
+        #action-panel {
+            margin-top: 35px;
+            display: flex;
+            justify-content: center;
+            transition: opacity 0.5s ease;
+        }
+
+        #action-panel.fade-out {
+            opacity: 0;
+        }
+
+        .wish-button {
+            background: linear-gradient(135deg, var(--accentLarge) 0%, var(--overlay) 100%);
+            color: var(--textOnAccent);
+            border: 2px solid var(--accentSmall);
+            padding: 18px 60px;
+            font-size: 1.4rem;
+            font-family: 'Marcellus', serif;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+            letter-spacing: 2px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .wish-button:hover {
+            transform: translateY(-4px);
+            border-color: var(--accentBright);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.4), 0 0 20px var(--accentSmall);
+        }
+
+        /* --- КИНЕМАТОГРАФИЧЕСКАЯ АНИМАЦИЯ --- */
+        #wish-scene {
+            display: none;
+            position: fixed;
+            width: 100%; height: 100%;
+            background-color: var(--bg);
+            top: 0; left: 0;
+            z-index: 100;
+        }
+
+        #animation-canvas {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+        }
+
+        .shockwave {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            border: 6px solid var(--accentBright);
+            border-radius: 50%;
+            opacity: 0;
+            pointer-events: none;
+            box-shadow: inset 0 0 30px var(--accentSmall), 0 0 30px var(--accentSmall);
+        }
+
+        @keyframes waveTrigger {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 1; border-width: 40px; }
+            40% { opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(3); opacity: 0; border-width: 1px; }
+        }
+
+        /* --- ЭКРАН БЛАГОСЛОВЕНИЙ --- */
+        #result-screen {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(30, 18, 18, 0.99);
+            backdrop-filter: blur(20px);
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            opacity: 0;
+            transition: opacity 0.6s ease;
+        }
+
+        #result-screen.show {
+            opacity: 1;
+        }
+
+        #result-content {
+            text-align: center;
+            max-width: 650px;
+            padding: 20px;
+            width: 100%;
+        }
+
+        #result-title {
+            font-family: 'Marcellus', serif;
+            font-size: 1.6rem;
+            color: var(--accentBright);
+            margin-bottom: 25px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.5s ease 0.3s;
+        }
+
+        #result-screen.show #result-title {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .blessing-card {
+            background: linear-gradient(145deg, var(--overlay), rgba(0,0,0,0.4));
+            border: 2px solid var(--accentLarge);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            transform: scale(0.8);
+            opacity: 0;
+            transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s;
+        }
+
+        #result-screen.show .blessing-card {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .blessing-card.legendary {
+            border-color: var(--accentBright);
+            box-shadow: 0 0 50px rgba(252, 207, 149, 0.25);
+            background: radial-gradient(circle at top, var(--overlay) 0%, var(--bg) 100%);
+            padding: 25px;
+        }
+
+        .blessing-name {
+            font-family: 'Marcellus', serif;
+            font-size: 2.4rem;
+            margin: 20px 0 10px 0;
+            color: var(--textOnAccent);
+        }
+
+        .blessing-desc {
+            font-size: 1.1rem;
+            color: var(--accentBright);
+            font-style: italic;
+            line-height: 1.6;
+            font-weight: 300;
+        }
+
+        .stars {
+            color: var(--accentBright);
+            font-size: 1.6rem;
+            margin-top: 20px;
+            letter-spacing: 6px;
+        }
+
+        .legendary-image {
+            width: 100%;
+            max-width: 500px;
+            border-radius: 12px;
+            border: 1px solid var(--accentBright);
+        }
+
+        #close-btn {
+            margin-top: 40px;
+            background: transparent;
+            border: 1px solid var(--text);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.5s ease 0.5s;
+        }
+
+        #result-screen.show #close-btn {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        #close-btn:hover {
+            background-color: var(--text);
+            color: var(--bg);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Аудиоэлемент фоновой музыки -->
+    <audio id="bg-music" src="Heller als Licht (инст).mp3" loop></audio>
+
+    <canvas id="ambient-canvas"></canvas>
+
+    <div id="app-wrapper">
+        <div id="controls">
+            <div class="controls-left">
+                <a href="../index.html" class="control-btn" style="text-decoration: none; display: inline-block;">Назад к инструментам</a>
+                <button class="control-btn" onclick="toggleTheme()">Сменить облик</button>
+                <button class="control-btn" id="music-toggle" onclick="toggleMusic()">Включить звук</button>
+            </div>
+            <div class="controls-right">
+                <button class="control-btn" onclick="showHistory()">Почести: <span id="pity-counter">0/90</span></button>
+            </div>
+        </div>
+
+        <div id="banner-frame">
+            <img id="banner-image" src="Gemini_Generated_Image_tbrd3ytbrd3ytbrd.png" alt="Милость Осени">
+        </div>
+
+        <div id="action-panel">
+            <button class="wish-button" onclick="executePrayer()">Отдать Почести</button>
+        </div>
+    </div>
+
+    <div id="wish-scene">
+        <canvas id="animation-canvas"></canvas>
+        <div class="shockwave" id="wave"></div>
+    </div>
+
+    <div id="result-screen">
+        <div id="result-content">
+            <div id="result-title">Вам ниспослано благословение</div>
+            <div id="result-display-area"></div>
+            <button class="wish-button" id="close-btn" onclick="closeResult()">Принять с благодарностью</button>
+        </div>
+    </div>
+
+    <script>
+        let totalPrayers = parseInt(localStorage.getItem('p_total')) || 0;
+        let pity5 = parseInt(localStorage.getItem('p_pity')) || 0;
+        let count5star = parseInt(localStorage.getItem('p_count5')) || 0;
+
+        const pityCounter = document.getElementById('pity-counter');
+        const bgMusic = document.getElementById('bg-music');
+        const musicToggle = document.getElementById('music-toggle');
+        updateCounters();
+
+        const blessingsPool = {
+            3: [
+                { name: "Осенний Покров", desc: "Тихий шелест увядающих листьев дарует покой разуму и защищает от невзгод." },
+                { name: "Дыхание Октября", desc: "Прохладный ветер укрепляет решимость и очищает помыслы идущего." },
+                { name: "Искры Костра", desc: "Малое благословение тепла, согревающее сердце в преддверии долгих зимних дней." },
+                { name: "Стойкость Дуба", desc: "Частица крепости вековых деревьев, помогающая выдерживать удары судьбы." }
+            ],
+            4: [
+                { name: "Валькирийский Обет", desc: "Прилив сил и доблести, вдохновляющий на преодоление любых преград на пути." },
+                { name: "Мудрость Чтеца", desc: "Глубокое понимание скрытых истин, открывающее новые horizons познания." },
+                { name: "Взор Чернокнижника", desc: "Тайное знание, позволяющее видеть суть вещей сквозь пелену иллюзий." },
+                { name: "Милость Увядания", desc: "Способность отпускать старое, освобождая место для грядущего перерождения." }
+            ]
+        };
+
+        // --- УПРАВЛЕНИЕ МУЗЫКОЙ ---
+        function toggleMusic() {
+            if (bgMusic.paused) {
+                bgMusic.play().then(() => {
+                    musicToggle.textContent = 'Выключить звук';
+                }).catch(err => {
+                    console.log("Ошибка воспроизведения аудио:", err);
+                });
+            } else {
+                bgMusic.pause();
+                musicToggle.textContent = 'Включить звук';
+            }
+        }
+
+        // --- ФОНОВЫЙ ХОЛСТ ЧАСТИЦ ---
+        const ambCanvas = document.getElementById('ambient-canvas');
+        const ambCtx = ambCanvas.getContext('2d');
+        let ambParticles = [];
+
+        function resizeAmbientCanvas() {
+            ambCanvas.width = window.innerWidth;
+            ambCanvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeAmbientCanvas);
+        resizeAmbientCanvas();
+
+        class AmbientParticle {
+            constructor() { this.reset(); this.y = Math.random() * ambCanvas.height; }
+            reset() {
+                this.x = Math.random() * ambCanvas.width;
+                this.y = ambCanvas.height + 20;
+                this.size = Math.random() * 3 + 1;
+                this.speedY = Math.random() * 0.5 + 0.2;
+                this.speedX = Math.sin(Math.random() * 2) * 0.3;
+                this.alpha = Math.random() * 0.5 + 0.1;
+            }
+            update() {
+                this.y -= this.speedY;
+                this.x += this.speedX;
+                if (this.y < -10) this.reset();
+            }
+            draw() {
+                let colorBright = getComputedStyle(document.documentElement).getPropertyValue('--accentSmall').trim();
+                ambCtx.save();
+                ambCtx.globalAlpha = this.alpha;
+                ambCtx.fillStyle = colorBright;
+                ambCtx.beginPath();
+                ambCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ambCtx.fill();
+                ambCtx.restore();
+            }
+        }
+
+        for(let i=0; i<60; i++) ambParticles.push(new AmbientParticle());
+
+        function animateAmbient() {
+            ambCtx.clearRect(0, 0, ambCanvas.width, ambCanvas.height);
+            ambParticles.forEach(p => { p.update(); p.draw(); });
+            requestAnimationFrame(animateAmbient);
+        }
+        animateAmbient();
+
+        // --- УСИЛЕННАЯ СИСТЕМА КИНЕМАТОГРАФИЧНОЙ АНИМАЦИИ ---
+        const animCanvas = document.getElementById('animation-canvas');
+        const animCtx = animCanvas.getContext('2d');
+        let animParticles = [];
+        let animAnimationId;
+
+        function updateCounters() {
+            pityCounter.textContent = `${pity5}/90`;
+            localStorage.setItem('p_total', totalPrayers);
+            localStorage.setItem('p_pity', pity5);
+            localStorage.setItem('p_count5', count5star);
+        }
+
+        function executePrayer() {
+            const wrapper = document.getElementById('app-wrapper');
+            const scene = document.getElementById('wish-scene');
+
+            let rarity = 3;
+            if (pity5 >= 89) rarity = 5;
+            else {
+                let rand = Math.random() * 100;
+                if (rand < 0.6) rarity = 5;
+                else if (rand < 5.6) rarity = 4;
+            }
+
+            totalPrayers++;
+            pity5++;
+            if (rarity === 5) { pity5 = 0; count5star++; }
+            updateCounters();
+
+            wrapper.style.pointerEvents = 'none';
+            document.getElementById('banner-frame').classList.add('fade-out');
+            document.getElementById('action-panel').classList.add('fade-out');
+
+            setTimeout(() => {
+                scene.style.display = 'block';
+                runEpicAnimation(rarity);
+            }, 500);
+        }
+
+        function runEpicAnimation(rarity) {
+            animCanvas.width = window.innerWidth;
+            animCanvas.height = window.innerHeight;
+            animParticles = [];
+
+            let colorLarge = getComputedStyle(document.documentElement).getPropertyValue('--accentLarge').trim();
+            let colorSmall = getComputedStyle(document.documentElement).getPropertyValue('--accentSmall').trim();
+            let colorBright = getComputedStyle(document.documentElement).getPropertyValue('--accentBright').trim();
+
+            let activeColor = rarity === 5 ? colorBright : (rarity === 4 ? colorSmall : colorLarge);
+
+            let centerX = animCanvas.width / 2;
+            let centerY = animCanvas.height / 2;
+
+            // Настройки кометы
+            let meteor = {
+                x: -100, y: -100,
+                startX: animCanvas.width * 0.1, startY: -50,
+                endX: centerX, endY: centerY,
+                progress: 0,
+                speed: 0.015,
+                size: rarity === 5 ? 18 : (rarity === 4 ? 12 : 7)
+            };
+
+            let timeline = 'implosion';
+            let timelineCounter = 0;
+            let shockwaveTriggered = false;
+
+            for (let i = 0; i < 120; i++) {
+                let angle = Math.random() * Math.PI * 2;
+                let distance = Math.random() * Math.max(animCanvas.width, animCanvas.height) + 200;
+                animParticles.push({
+                    type: 'implode',
+                    x: centerX + Math.cos(angle) * distance,
+                    y: centerY + Math.sin(angle) * distance,
+                    targetX: centerX, targetY: centerY,
+                    speed: Math.random() * 0.04 + 0.02,
+                    size: Math.random() * 3 + 1,
+                    alpha: 1
+                });
+            }
+
+            function drawFrame() {
+                animCtx.fillStyle = 'rgba(30, 18, 18, 0.12)';
+                animCtx.fillRect(0, 0, animCanvas.width, animCanvas.height);
+
+                if (timeline === 'implosion') {
+                    timelineCounter++;
+                    let allDone = true;
+
+                    animParticles.forEach(p => {
+                        p.x += (p.targetX - p.x) * p.speed;
+                        p.y += (p.targetY - p.y) * p.speed;
+                        let dist = Math.hypot(p.targetX - p.x, p.targetY - p.y);
+                        if (dist > 5) allDone = false;
+                        else p.alpha -= 0.1;
+
+                        if (p.alpha > 0) {
+                            animCtx.beginPath();
+                            animCtx.fillStyle = activeColor;
+                            animCtx.globalAlpha = p.alpha;
+                            animCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                            animCtx.fill();
+                        }
+                    });
+
+                    if (allDone || timelineCounter > 50) {
+                        timeline = 'flight';
+                        animParticles = [];
+                    }
+                }
+
+                if (timeline === 'flight') {
+                    meteor.progress += meteor.speed;
+                    let t = meteor.progress;
+
+                    meteor.x = meteor.startX + (meteor.endX - meteor.startX) * Math.sin(t * Math.PI / 2);
+                    meteor.y = meteor.startY + (meteor.endY - meteor.startY) * (t * t);
+
+                    if (t < 1) {
+                        for(let j = 0; j < 3; j++) {
+                            let spiralAngle = t * 35 + (j * Math.PI * 2 / 3);
+                            let radius = (1 - t) * 40 + 5;
+                            animParticles.push({
+                                type: 'trail',
+                                x: meteor.x + Math.cos(spiralAngle) * radius,
+                                y: meteor.y + Math.sin(spiralAngle) * radius,
+                                vx: (Math.random() - 0.5) * 2,
+                                vy: (Math.random() - 0.5) * 2,
+                                size: Math.random() * 3 + 1,
+                                alpha: 1,
+                                decay: Math.random() * 0.03 + 0.015
+                            });
+                        }
+
+                        animCtx.save();
+                        animCtx.shadowBlur = 50;
+                        animCtx.shadowColor = activeColor;
+                        animCtx.fillStyle = '#fcf8f1';
+                        animCtx.beginPath();
+                        animCtx.arc(meteor.x, meteor.y, meteor.size, 0, Math.PI * 2);
+                        animCtx.fill();
+                        animCtx.restore();
+                    }
+
+                    animParticles.forEach((p, idx) => {
+                        p.x += p.vx; p.y += p.vy;
+                        p.alpha -= p.decay;
+                        if (p.alpha <= 0) {
+                            animParticles.splice(idx, 1);
+                        } else {
+                            animCtx.beginPath();
+                            animCtx.fillStyle = activeColor;
+                            animCtx.globalAlpha = p.alpha;
+                            animCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                            animCtx.fill();
+                        }
+                    });
+
+                    if (t >= 0.96 && !shockwaveTriggered) {
+                        shockwaveTriggered = true;
+                        triggerShockwave(rarity);
+                        timeline = 'burst';
+                        timelineCounter = 0;
+
+                        let burstCount = rarity === 5 ? 200 : (rarity === 4 ? 100 : 50);
+                        for (let i = 0; i < burstCount; i++) {
+                            let angle = Math.random() * Math.PI * 2;
+                            let speed = Math.random() * (rarity * 4) + 3;
+                            animParticles.push({
+                                type: 'burst',
+                                x: centerX, y: centerY,
+                                vx: Math.cos(angle) * speed,
+                                vy: Math.sin(angle) * speed,
+                                size: Math.random() * (rarity * 1.5) + 2,
+                                alpha: 1,
+                                decay: Math.random() * 0.02 + 0.01
+                            });
+                        }
+                    }
+                }
+
+                if (timeline === 'burst') {
+                    timelineCounter++;
+                    
+                    animParticles.forEach((p, idx) => {
+                        p.x += p.vx; p.y += p.vy;
+                        p.vx *= 0.98; p.vy *= 0.98;
+                        p.alpha -= p.decay;
+
+                        if (p.alpha <= 0) {
+                            animParticles.splice(idx, 1);
+                        } else {
+                            animCtx.beginPath();
+                            animCtx.fillStyle = activeColor;
+                            animCtx.globalAlpha = p.alpha;
+                            animCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                            animCtx.fill();
+                        }
+                    });
+
+                    if (timelineCounter > 75) {
+                        cancelAnimationFrame(animAnimationId);
+                        showResultsAndReset(rarity);
+                        return;
+                    }
+                }
+
+                animCtx.restore();
+                animAnimationId = requestAnimationFrame(drawFrame);
+            }
+
+            drawFrame();
+        }
+
+        function triggerShockwave(rarity) {
+            const wave = document.getElementById('wave');
+            let colors = { 3: 'var(--accentLarge)', 4: 'var(--accentSmall)', 5: 'var(--accentBright)' };
+            wave.style.borderColor = colors[rarity];
+            wave.style.animation = 'waveTrigger 1.1s cubic-bezier(0.1, 0.8, 0.2, 1) forwards';
+        }
+
+        function showResultsAndReset(rarity) {
+            document.getElementById('wish-scene').style.display = 'none';
+            document.getElementById('wave').style.animation = 'none';
+            
+            renderResult(rarity);
+            
+            const resScreen = document.getElementById('result-screen');
+            resScreen.style.display = 'flex';
+            setTimeout(() => resScreen.classList.add('show'), 50);
+
+            document.getElementById('banner-frame').classList.remove('fade-out');
+            document.getElementById('action-panel').classList.remove('fade-out');
+            document.getElementById('app-wrapper').style.pointerEvents = 'auto';
+        }
+
+        function renderResult(rarity) {
+            const area = document.getElementById('result-display-area');
+            if (rarity === 5) {
+                area.innerHTML = `
+                    <div class="blessing-card legendary">
+                        <img src="Gemini_Generated_Image_tbrd3ytbrd3ytbrd.png" class="legendary-image" alt="Октобрина">
+                        <div class="blessing-name">Благословение Валькирии</div>
+                        <div class="blessing-desc">Высшая милость Октобрины, Повелительницы Винксопедии. Ваш путь отныне освещен чистым золотом осени, а дух защищен крыльями бессмертных.</div>
+                        <div class="stars">✦✦✦✦✦</div>
+                    </div>
+                `;
+            } else {
+                const pool = blessingsPool[rarity];
+                const blessing = pool[Math.floor(Math.random() * pool.length)];
+                area.innerHTML = `
+                    <div class="blessing-card">
+                        <div style="font-size: 3.5rem; color: var(--accentBright)">🕯️</div>
+                        <div class="blessing-name">${blessing.name}</div>
+                        <div class="blessing-desc">${blessing.desc}</div>
+                        <div class="stars">${rarity === 4 ? '✦✦✦✦' : '✦✦✦'}</div>
+                    </div>
+                `;
+            }
+        }
+
+        function closeResult() {
+            const resScreen = document.getElementById('result-screen');
+            resScreen.classList.remove('show');
+            setTimeout(() => resScreen.style.display = 'none', 500);
+        }
+
+        function showHistory() {
+            alert(`
+[ Книга Почтения Октобрине ]
+Всего совершено молитв: ${totalPrayers}
+До высшего благословения (гарант): ${90 - pity5}
+Получено Высших Благословений: ${count5star}
+            `);
+        }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            html.classList.toggle('dark');
+            html.classList.toggle('light');
+        }
+    </script>
+</body>
+</html>
