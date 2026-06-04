@@ -31,6 +31,7 @@
         </div>
     </main>
 
+    <script src="common.js"></script>
     <script>
         const API = "https://winxopedia.fandom.com/ru/api.php";
 
@@ -52,15 +53,16 @@
 
             const pages = await fetchAllMembers("Незавершённые_статьи");
             let groups = {};
+            let articleMetadata = {}; // Храним данные для алгоритма
             let count = 0;
 
             for (let i = 0; i < pages.length; i += 10) {
                 let chunk = pages.slice(i, i + 10);
                 await Promise.all(chunk.map(async (title) => {
                     let cats = await fetchPageCategories(title);
-                    cats.forEach(cat => {
-                        if (cat === "Незавершённые статьи") return;
-                        
+                    articleMetadata[title] = cats.filter(c => c !== "Незавершённые статьи");
+                    
+                    articleMetadata[title].forEach(cat => {
                         const safeId = getSafeId(cat);
                         if (!groups[cat]) {
                             groups[cat] = [];
@@ -84,6 +86,21 @@
                 status.textContent = `Обработано: ${count} из ${pages.length}`;
             }
 
+            // --- Алгоритм поиска главной цели ---
+            let topArticle = { title: "", score: -1 };
+            pages.forEach(title => {
+                let cats = articleMetadata[title] || [];
+                let score = 0;
+                cats.forEach(cat => {
+                    score += (groups[cat] ? groups[cat].length : 0);
+                });
+                score *= cats.length; 
+
+                if (score > topArticle.score) {
+                    topArticle = { title: title, score: score };
+                }
+            });
+
             // Строим график
             const sorted = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length);
             sorted.forEach(cat => {
@@ -95,7 +112,7 @@
                     </div>`;
             });
             
-            status.textContent = "Готово!";
+            status.innerHTML = `<strong>Приоритетная цель:</strong> <a href="https://winxopedia.fandom.com/ru/wiki/${encodeURIComponent(topArticle.title)}" target="_blank" style="color:var(--accentLarge)">${topArticle.title}</a> (критичность: ${topArticle.score})`;
             btn.disabled = false;
         }
 
