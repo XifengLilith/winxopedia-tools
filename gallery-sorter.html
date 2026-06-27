@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Сортировщик галерей</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .input-group { margin-bottom: 20px; }
+        input[list] { width: 318px; padding: 8px; font-size: 14px; background: var(--bg); color: var(--text); border: 1px solid var(--overlay); }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Сортировщик галерей</h1>
+        <a href="index.html"><button>Назад в меню</button></a>
+    </header>
+
+    <main class="refiner-container">
+        <div class="controls">
+            <div class="input-group">
+                <label for="categoryInput">Выберите или введите категорию:</label><br>
+                <input type="text" id="categoryInput" list="charList" placeholder="Например: Категория:Изображения Блум">
+                <datalist id="charList"></datalist>
+            </div>
+            <button id="startBtn">Сформировать галереи</button>
+            <p>Статус: <span id="status">Ожидание запуска...</span></p>
+        </div>
+
+        <div class="output-header">
+            <h2>Код для вики:</h2>
+            <button id="copyBtn" style="display:none;">Скопировать код</button>
+        </div>
+        <div id="output" style="white-space: pre-wrap; background: var(--bg); border: 1px solid var(--overlay); padding: 10px; margin-top: 10px;">Здесь появится код...</div>
+    </main>
+
+    <script src="common.js"></script>
+    <script>
+        const API_URL = 'https://winxopedia.fandom.com/ru/api.php';
+        
+        const episodes = {
+            101: "Неожиданное событие", 102: "Добро пожаловать в Магикс!", 103: "Алфея — школа для фей",
+            104: "Чёрное грязевое болото (серия)", 105: "Свидание с кошмаром", 106: "Миссия в Облачной Башне",
+            107: "Друзья познаются в беде", 108: "Дружба рушится", 109: "Обманутые!", 110: "Проверка для Блум",
+            111: "Чудовище и ива", 112: "Мисс Магикс (серия)", 113: "Большой секрет раскрыт",
+            114: "Тёмный секрет Блум", 115: "Главное — честь!", 116: "Холодное заклинание",
+            117: "Тайна среди тайн", 118: "Хранительница силы дракона", 119: "Падение Магикса",
+            120: "Миссия в Домино", 121: "Корона мечты", 122: "Атака на Облачную Башню",
+            123: "Игра сил", 124: "Осада ведьм", 125: "Последний вызов", 126: "Падение ведьм"
+        };
+
+        async function loadCategoryList() {
+            const list = document.getElementById('charList');
+            const url = `${API_URL}?action=query&list=categorymembers&cmtitle=Category:Галерея_персонажей&cmlimit=500&format=json&origin=*`;
+            const res = await fetch(url);
+            const data = await res.json();
+            data.query.categorymembers.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.title.replace(' ', '_');
+                list.appendChild(opt);
+            });
+        }
+        function normalizeFileName(name) { return name.trim().replace(/^Файл:/i, '').replace(/_/g, ' '); }
+
+        async function getAllFilesFromCategory(categoryName) {
+            let files = new Set();
+            let cmcontinue = '';
+            do {
+                const res = await fetch(`${API_URL}?action=query&list=categorymembers&cmtitle=${encodeURIComponent(categoryName)}&cmtype=file&cmlimit=500&cmcontinue=${cmcontinue}&format=json&origin=*`);
+                const data = await res.json();
+                if (data.query?.categorymembers) data.query.categorymembers.forEach(i => files.add(normalizeFileName(i.title)));
+                cmcontinue = data.continue?.cmcontinue || '';
+            } while (cmcontinue);
+            return files;
+        }
+
+        async function getChronologicalImages(page) {
+            const res = await fetch(`${API_URL}?action=query&prop=revisions&titles=${encodeURIComponent(page)}&rvprop=content&format=json&origin=*`);
+            const data = await res.json();
+            const pageData = Object.values(data.query.pages)[0];
+            const text = pageData.revisions?.[0]?.['*'] || '';
+            const matches = [...text.matchAll(/<gallery[^>]*>([\s\S]*?)<\/gallery>/gi)];
+            return matches.flatMap(m => m[1].split('\n').filter(l => l.trim() && !l.startsWith('{')).map(l => l.split('|')[0].trim()));
+        }
+
+        async function startSorting() {
+            const cat = document.getElementById('categoryInput').value.trim();
+            const status = document.getElementById('status');
+            const output = document.getElementById('output');
+            if (!cat) return alert("Введите категорию!");
+            
+            status.textContent = "Загрузка файлов...";
+            const files = await getAllFilesFromCategory(cat);
+            let result = "";
+
+            for (const [code, title] of Object.entries(episodes)) {
+                status.textContent = `Обработка: ${title}...`;
+                const gallery = await getChronologicalImages(`${title}/Галерея`);
+                const sorted = gallery.filter(f => files.has(normalizeFileName(f)));
+                if (sorted.length > 0) {
+                    result += `<gallery caption="Код эпизода: ${code}" mode="packed" widths="185">\n${sorted.map(f => normalizeFileName(f)).join('\n')}\n</gallery>\n\n`;
+                }
+            }
+            output.textContent = result || "Файлов не найдено.";
+            document.getElementById('copyBtn').style.display = 'block';
+            status.textContent = "Готово!";
+        }
+
+        document.getElementById('copyBtn').onclick = () => {
+            navigator.clipboard.writeText(document.getElementById('output').textContent);
+            alert("Скопировано!");
+        };
+
+        document.getElementById('startBtn').addEventListener('click', startSorting);
+        loadCategoryList();
+    </script>
+</body>
+</html>
